@@ -9,7 +9,7 @@ A macOS menu bar app that records, for each day, whether you worked at the offic
 - Office wins: if the office network is seen at any point during the day, the day stays `office`.
 - Monthly office target (12 by default): the panel shows how many office days are left, how many workdays remain, and a Mon–Fri grid of the month.
 - The menu bar icon shows today's workplace, colored by how the target is going: monochrome when on track, orange with one home day to spare or less, red when the target can't be reached anymore, green when it's done.
-- Settings (gear icon or ⌘,): manual override for today only ("Auto" goes back to detection), a free-text note per day (empty by default), launch at login, the CSV file and Quit.
+- Settings (gear icon or ⌘,): manual override for today only ("Auto" goes back to detection), a free-text note per day (empty by default), launch at login, the CSV and config files, and Quit.
 
 ## Configuration
 

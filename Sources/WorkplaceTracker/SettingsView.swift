@@ -19,16 +19,20 @@ struct SettingsView: View {
                     .disabled(state.today == nil)
                     .onSubmit { state.setNote(note) }
             }
-            Section("General") {
+            Section {
                 Toggle("Launch at login", isOn: Binding(get: { state.launchAtLogin }, set: state.setLaunchAtLogin))
-                LabeledContent("CSV file") {
-                    HStack {
-                        Text(state.config.csvURL.displayPath)
-                            .foregroundStyle(.secondary)
-                            .truncationMode(.middle)
-                        Button("Open") { NSWorkspace.shared.open(state.config.csvURL) }
-                    }
+                FileRow(title: "CSV file", url: state.config.csvURL, button: "Open") {
+                    NSWorkspace.shared.open(state.config.csvURL)
                 }
+                FileRow(title: "Config file", url: Config.fileURL, button: "Show in Finder") {
+                    showInFinder(Config.fileURL)
+                }
+            } header: {
+                Text("General")
+            } footer: {
+                Text("Restart the app to apply config changes.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 Button("Quit WorkplaceTracker") { NSApp.terminate(nil) }
@@ -42,6 +46,36 @@ struct SettingsView: View {
         // Closing the window or clicking elsewhere saves the note too.
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
             state.setNote(note)
+        }
+    }
+
+    /// Selects the file in Finder, or opens its folder when the file doesn't exist yet.
+    private func showInFinder(_ url: URL) {
+        if FileManager.default.fileExists(atPath: url.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            let folder = url.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(folder)
+        }
+    }
+}
+
+private struct FileRow: View {
+    let title: String
+    let url: URL
+    let button: String
+    let action: () -> Void
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack {
+                Text(url.displayPath)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Button(button, action: action)
+            }
         }
     }
 }
