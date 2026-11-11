@@ -32,7 +32,7 @@ private struct MenuView: View {
         }
         Divider()
         Picker("Today", selection: Binding(get: { state.override }, set: state.setOverride)) {
-            Text("Automatic").tag(Workplace?.none)
+            Text("🔄 Automatic").tag(Workplace?.none)
             ForEach(Workplace.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
         }
         .pickerStyle(.inline)
@@ -80,8 +80,8 @@ private struct MenuView: View {
 private extension Workplace {
     var label: String {
         switch self {
-        case .office: "Office"
-        case .home: "Home"
+        case .office: "🏢 Office"
+        case .home: "🏠 Home"
         }
     }
 

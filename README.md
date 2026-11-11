@@ -2,6 +2,8 @@
 
 A macOS menu bar app that records, for each day, whether you worked at the office or from home, based on the connected Wi-Fi network.
 
+<img src="docs/menu.png" alt="WorkplaceTracker menu" width="440">
+
 - Connected to the office SSID → `office`; any other network → `home`.
 - No Wi-Fi → nothing is recorded.
 - Office wins: if the office network is seen at any point during the day, the day stays `office`.
