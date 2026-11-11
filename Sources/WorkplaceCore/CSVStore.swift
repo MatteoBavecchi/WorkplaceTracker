@@ -38,22 +38,15 @@ public struct CSVStore {
             .compactMap(Self.parse)
     }
 
-    public func record(for date: String) throws -> DayRecord? {
-        try load().first { $0.date == date }
-    }
-
-    public func upsert(_ record: DayRecord) throws {
-        var records = try load().filter { $0.date != record.date }
-        records.append(record)
-        try save(records)
-    }
-
-    private func save(_ records: [DayRecord]) throws {
-        let rows = records.sorted { $0.date < $1.date }.map(Self.format)
-        let text = ([Self.header] + rows).joined(separator: "\n") + "\n"
+    /// Saves the record, replacing any for the same day, and returns all records sorted by date.
+    @discardableResult
+    public func upsert(_ record: DayRecord) throws -> [DayRecord] {
+        let records = (try load().filter { $0.date != record.date } + [record]).sorted { $0.date < $1.date }
+        let text = ([Self.header] + records.map(Self.format)).joined(separator: "\n") + "\n"
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         // Atomic so a reader (Numbers, Excel) never sees a half-written file.
         try Data(text.utf8).write(to: url, options: .atomic)
+        return records
     }
 
     /// Accepts rows written before the note column existed (4 fields).

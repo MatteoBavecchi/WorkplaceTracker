@@ -7,88 +7,78 @@ struct WorkplaceTrackerApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuView(state: state)
+            PanelView(state: state)
         } label: {
-            Image(systemName: state.error != nil ? "exclamationmark.triangle" : state.today?.status.symbol ?? "questionmark.circle")
+            Image(nsImage: icon)
         }
+        .menuBarExtraStyle(.window)
+
+        Window("Settings", id: SettingsView.windowID) {
+            SettingsView(state: state)
+        }
+        .windowResizability(.contentSize)
+    }
+
+    /// Today's workplace, colored by how the monthly target is going.
+    private var icon: NSImage {
+        if state.error != nil { return .menuBarSymbol("exclamationmark.triangle", tint: nil) }
+        return .menuBarSymbol(state.today?.status.symbol ?? "questionmark.circle", tint: state.month.pace.tint)
     }
 }
 
-private struct MenuView: View {
+/// Progress, calendar and today. Everything else lives in Settings.
+private struct PanelView: View {
     @ObservedObject var state: AppState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text(summary)
-        if let note = state.today?.note, !note.isEmpty {
-            Text("Note: \(note)")
-        }
-        if let error = state.error {
-            Text("⚠️ \(error)")
-        }
-        if state.needsLocation {
-            Button("Grant Location Access…") {
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")!)
+        VStack(alignment: .leading, spacing: 12) {
+            MonthView(month: state.month)
+
+            Divider()
+
+            HStack {
+                Text(today)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    openWindow(id: SettingsView.windowID)
+                    // Menu bar apps aren't frontmost; without this the window opens behind others.
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.borderless)
+                .keyboardShortcut(",")
+                .help("Settings")
+            }
+
+            // Shown only when something needs fixing.
+            if state.needsLocation {
+                Button("Grant location access to detect your Wi-Fi") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")!)
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+            }
+            if let error = state.error {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.red)
             }
         }
-        Divider()
-        Picker("Today", selection: Binding(get: { state.override }, set: state.setOverride)) {
-            Text("🔄 Automatic").tag(Workplace?.none)
-            ForEach(Workplace.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
-        }
-        .pickerStyle(.inline)
-        Button("Edit Note…") {
-            // Let the menu close before showing a modal dialog.
-            DispatchQueue.main.async(execute: editNote)
-        }
-        .disabled(state.today == nil)
-        Divider()
-        Button("Open CSV") { NSWorkspace.shared.open(state.config.csvURL) }
-        Toggle("Launch at Login", isOn: Binding(get: { state.launchAtLogin }, set: state.setLaunchAtLogin))
-        Divider()
-        Button("Quit") { NSApp.terminate(nil) }
-            .keyboardShortcut("q")
-    }
-
-    private func editNote() {
-        let field = NSTextField(string: state.today?.note ?? "")
-        field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
-        field.placeholderString = "e.g. client visit"
-
-        let alert = NSAlert()
-        alert.messageText = "Note for Today"
-        alert.informativeText = "Leave empty to clear the note."
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
-
-        // Menu bar apps are not frontmost by default; without this the dialog opens behind other windows.
-        NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn {
-            state.setNote(field.stringValue)
+        .padding(14)
+        .frame(width: 300)
+        // The panel stays alive between openings: refresh whenever it's shown.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            state.refresh()
         }
     }
 
-    private var summary: String {
-        guard let today = state.today else { return "Today: no data (Wi-Fi not detected)" }
-        let source = today.source == .manual ? "manual" : "auto"
-        let time = today.updatedAt.formatted(date: .omitted, time: .shortened)
-        return "Today: \(today.status.label) · \(source) · saved at \(time)"
-    }
-}
-
-private extension Workplace {
-    var label: String {
-        switch self {
-        case .office: "🏢 Office"
-        case .home: "🏠 Home"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .office: "building.2"
-        case .home: "house"
-        }
+    private var today: String {
+        let date = Date().formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().locale(english))
+        guard let status = state.today?.status else { return "Today, \(date)" }
+        return "Today, \(date) · \(status.label)"
     }
 }

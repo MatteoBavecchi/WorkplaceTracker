@@ -5,6 +5,8 @@ import Foundation
 public struct Config: Decodable {
     public var officeSSID: String?
     public var csvPath = "~/Documents/workplace.csv"
+    /// Office days to do each month.
+    public var monthlyTarget = 12
 
     public var csvURL: URL {
         URL(fileURLWithPath: (csvPath as NSString).expandingTildeInPath)
@@ -19,10 +21,11 @@ public struct Config: Decodable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         officeSSID = try c.decodeIfPresent(String.self, forKey: .officeSSID)
         csvPath = try c.decodeIfPresent(String.self, forKey: .csvPath) ?? csvPath
+        monthlyTarget = try c.decodeIfPresent(Int.self, forKey: .monthlyTarget) ?? monthlyTarget
     }
 
     private enum CodingKeys: String, CodingKey {
-        case officeSSID, csvPath
+        case officeSSID, csvPath, monthlyTarget
     }
 
     /// Falls back to defaults when the file is missing or invalid.

@@ -4,7 +4,8 @@ import WorkplaceCore
 
 @MainActor
 final class AppState: ObservableObject {
-    @Published private(set) var today: DayRecord?
+    /// Every CSV row; today and the month summary are derived from it.
+    @Published private(set) var records: [DayRecord] = []
     @Published private(set) var error: String?
     @Published private(set) var needsLocation = false
     @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -31,6 +32,15 @@ final class AppState: ObservableObject {
         refresh()
     }
 
+    var today: DayRecord? {
+        let date = DayFormat.day(Date())
+        return records.first { $0.date == date }
+    }
+
+    var month: MonthSummary {
+        MonthSummary(records: records, target: config.monthlyTarget, now: Date())
+    }
+
     /// The manual choice for today, nil when detection is automatic.
     var override: Workplace? {
         today?.source == .manual ? today?.status : nil
@@ -43,16 +53,14 @@ final class AppState: ObservableObject {
 
     func refresh() {
         attempt {
-            let now = Date()
-            today = try store.record(for: DayFormat.day(now))
-            if let updated = Resolver.resolve(current: today, detected: detected, now: now) {
-                try store.upsert(updated)
-                today = updated
+            records = try store.load()
+            if let updated = Resolver.resolve(current: today, detected: detected, now: Date()) {
+                records = try store.upsert(updated)
             }
         }
         needsLocation = !monitor.isAuthorized
         if config.officeSSID == nil {
-            error = "Set officeSSID in \((Config.fileURL.path as NSString).abbreviatingWithTildeInPath)"
+            error = "Set officeSSID in \(Config.fileURL.displayPath)"
         }
     }
 
@@ -62,15 +70,14 @@ final class AppState: ObservableObject {
     }
 
     func setNote(_ note: String) {
-        guard let today else { return }
-        save(status: today.status, source: today.source, note: note.trimmingCharacters(in: .whitespacesAndNewlines))
+        let note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let today, note != today.note else { return }
+        save(status: today.status, source: today.source, note: note)
     }
 
     private func save(status: Workplace?, source: Source, note: String) {
         guard let status else { return }
-        if attempt({ try store.upsert(DayRecord(status: status, source: source, note: note, at: Date())) }) {
-            refresh()
-        }
+        attempt { records = try store.upsert(DayRecord(status: status, source: source, note: note, at: Date())) }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -84,15 +91,12 @@ final class AppState: ObservableObject {
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
-    @discardableResult
-    private func attempt(_ body: () throws -> Void) -> Bool {
+    private func attempt(_ body: () throws -> Void) {
         do {
             try body()
             error = nil
-            return true
         } catch {
             self.error = error.localizedDescription
-            return false
         }
     }
 }
